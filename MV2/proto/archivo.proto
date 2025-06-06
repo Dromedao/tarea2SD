@@ -1,0 +1,62 @@
+syntax = "proto3";
+
+package dronesystem;
+
+// Opción de Go corregida y simplificada
+option go_package = "./;proto";
+
+import "google/protobuf/empty.proto";
+
+// ===================================================================
+// DEFINICIÓN DE TODOS LOS SERVICIOS GRPC
+// ===================================================================
+
+// Servicio 1: Expuesto por 'asignacion.go' para ser llamado por el 'cliente.go'
+service AssignService {
+  rpc AssignDrone (EmergencyRequest) returns (google.protobuf.Empty);
+}
+
+// Servicio 2: Expuesto por 'drones.go' para ser llamado por 'asignacion.go'
+service DroneService {
+  rpc AtenderEmergencia(DroneEmergencyRequest) returns (DroneEmergencyResponse);
+}
+
+// Servicio 3: Expuesto por 'monitoreo.go' para ser llamado por el 'cliente.go'
+service MonitoringService {
+  rpc StreamUpdates(google.protobuf.Empty) returns (stream UpdateResponse);
+}
+
+// ===================================================================
+// DEFINICIÓN DE TODOS LOS MENSAJES
+// ===================================================================
+
+// --- Mensajes para AssignService ---
+message EmergencyRequest {
+  string name = 1;
+  double latitude = 2;
+  double longitude = 3;
+  int32 magnitude = 4;
+}
+
+message DroneResponse {
+  string drone_id = 1;
+  string status = 2;
+}
+
+// --- Mensajes para DroneService ---
+message DroneEmergencyRequest {
+  string name = 1;
+  double latitude = 2;
+  double longitude = 3;
+  int32 magnitude = 4;
+  string drone_id = 5;
+}
+
+message DroneEmergencyResponse {
+  string status = 1;
+}
+
+// --- Mensajes para MonitoringService ---
+message UpdateResponse {
+  string message = 1;
+}

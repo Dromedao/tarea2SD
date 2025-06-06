@@ -1,0 +1,20 @@
+[
+  {
+    "name": "Incendio Forestal Sur",
+    "latitude": 50,
+    "longitude": 10,
+    "magnitude": 5
+  },
+  {
+    "name": "Incendio de palets",
+    "latitude": -25,
+    "longitude": 30,
+    "magnitude": 1
+  },
+  {
+    "name": "Incendio de bus",
+    "latitude": 25,
+    "longitude": 25,
+    "magnitude": 3
+  }
+]
