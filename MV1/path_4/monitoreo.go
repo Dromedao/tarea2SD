@@ -17,6 +17,19 @@ const maxRetries = 20
 const retryDelay = 10 * time.Second
 
 func withRetry(action func() error, description string) error {
+	// withRetry ejecuta una función 'action' con reintentos en caso de fallo.
+	//
+	// Esta función intenta ejecutar la 'action' un número máximo de veces (definido por 'maxRetries').
+	// Si la 'action' retorna un error, espera un 'retryDelay' antes de reintentar.
+	// Muestra un mensaje de log en cada fallo y un mensaje final si todos los intentos fallan.
+	//
+	// Parámetros:
+	//   action: Una función sin parámetros que retorna un error. Esta es la operación que se intentará.
+	//   description: Una cadena que describe la acción que se está realizando, utilizada para los mensajes de log.
+	//
+	// Retorna:
+	//   error: nil si la 'action' se ejecuta exitosamente en cualquier intento,
+	//          o un error que describe el fallo definitivo si todos los reintentos fallan.
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = action()
@@ -37,6 +50,20 @@ type monitoringServer struct {
 }
 
 func (s *monitoringServer) StreamUpdates(req *emptypb.Empty, stream pb.MonitoringService_StreamUpdatesServer) error {
+	// StreamUpdates es un método de servidor gRPC que permite a los clientes
+	// suscribirse a un flujo continuo de actualizaciones de monitoreo.
+	//
+	// Este método envía mensajes de actualización a medida que llegan a través del canal 's.updates'.
+	// El flujo se mantiene abierto hasta que el cliente se desconecta o ocurre un error de envío.
+	//
+	// Parámetros:
+	//   req: Un mensaje *emptypb.Empty, ya que esta RPC no requiere parámetros de entrada específicos.
+	//   stream: Un objeto pb.MonitoringService_StreamUpdatesServer que representa el flujo de respuesta
+	//           a través del cual se envían las actualizaciones al cliente.
+	//
+	// Retorna:
+	//   error: nil si el cliente se desconecta limpiamente, o un error si falla el envío
+	//          de una actualización al cliente.
 	for {
 		select {
 		case <-stream.Context().Done():

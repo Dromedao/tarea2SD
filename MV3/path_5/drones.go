@@ -28,6 +28,19 @@ type server struct {
 }
 
 func withRetry(action func() error, description string) error {
+	// withRetry ejecuta una función 'action' con reintentos en caso de fallo.
+	//
+	// Esta función intenta ejecutar la 'action' un número máximo de veces (definido por 'maxRetries').
+	// Si la 'action' retorna un error, espera un 'retryDelay' antes de reintentar.
+	// Muestra un mensaje de log en cada fallo y un mensaje final si todos los intentos fallan.
+	//
+	// Parámetros:
+	//   action: Una función sin parámetros que retorna un error. Esta es la operación que se intentará.
+	//   description: Una cadena que describe la acción que se está realizando, utilizada para los mensajes de log.
+	//
+	// Retorna:
+	//   error: nil si la 'action' se ejecuta exitosamente en cualquier intento,
+	//          o un error que describe el fallo definitivo si todos los reintentos fallan.
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = action()
@@ -43,6 +56,20 @@ func withRetry(action func() error, description string) error {
 }
 
 func (s *server) obtenerPosicionDron(droneID string) (float64, float64, error) {
+	// obtenerPosicionDron recupera la latitud y longitud de un dron específico desde la base de datos MongoDB.
+	//
+	// La función consulta la colección "drones" en la base de datos "emergencias"
+	// para encontrar el dron con el 'droneID' proporcionado. La operación de búsqueda
+	// incluye reintentos para manejar fallos temporales de conexión a la base de datos.
+	//
+	// Parámetros:
+	//   droneID: Una cadena que representa el identificador único del dron cuya posición se desea obtener.
+	//
+	// Retorna:
+	//   float64: La latitud del dron.
+	//   float64: La longitud del dron.
+	//   error: nil si la operación es exitosa y se encuentra la posición del dron,
+	//          o un error si el dron no se encuentra o si ocurre un fallo en la base de datos después de los reintentos.
 	coll := s.mongoClient.Database("emergencias").Collection("drones")
 	var dron struct {
 		Latitude  float64 `bson:"latitude"`
@@ -59,6 +86,23 @@ func (s *server) obtenerPosicionDron(droneID string) (float64, float64, error) {
 }
 
 func (s *server) AtenderEmergencia(ctx context.Context, req *pb.DroneEmergencyRequest) (*pb.DroneEmergencyResponse, error) {
+	// AtenderEmergencia es un método RPC que simula la atención de una emergencia por un dron.
+	//
+	// Esta función calcula el tiempo de desplazamiento y el tiempo necesario para apagar la emergencia
+	// basándose en la distancia del dron a la emergencia y la magnitud de esta.
+	// Publica actualizaciones de estado a un servicio de monitoreo en segundo plano
+	// y luego simula la duración de la operación esperando los tiempos calculados.
+	// Finalmente, actualiza la posición del dron y notifica al servicio de registro
+	// que la emergencia ha sido extinguida.
+	//
+	// Parámetros:
+	//   ctx: El contexto de la solicitud gRPC.
+	//   req: Un puntero a un objeto *pb.DroneEmergencyRequest que contiene
+	//        los detalles de la emergencia (nombre, coordenadas, magnitud) y el ID del dron asignado.
+	//
+	// Retorna:
+	//   *pb.DroneEmergencyResponse: Un objeto de respuesta que indica el estado final de la emergencia ("Extinguido").
+	//   error: nil si la operación se completa sin errores.
 	log.Printf("🚁 Emergencia recibida: %s, magnitud: %d con dron %s", req.Name, req.Magnitude, req.DroneId)
 
 	lat, lon, err := s.obtenerPosicionDron(req.DroneId)
@@ -89,7 +133,23 @@ func (s *server) AtenderEmergencia(ctx context.Context, req *pb.DroneEmergencyRe
 }
 
 func (s *server) publicarActualizacionesParaMonitor(req *pb.DroneEmergencyRequest, tDesplazamiento, tApagado time.Duration) {
-
+	// publicarActualizacionesParaMonitor simula y publica actualizaciones de estado de un dron
+	// a un servicio de monitoreo a través de RabbitMQ, cubriendo las fases de desplazamiento y apagado.
+	//
+	// Esta función se ejecuta en una goroutine separada para no bloquear la ejecución principal.
+	// Utiliza "tickers" para enviar mensajes de estado periódicamente (cada 5 segundos)
+	// durante las fases de desplazamiento y apagado del dron. Una vez que una fase termina
+	// (determinada por 'tDesplazamiento' y 'tApagado'), pasa a la siguiente fase y,
+	// finalmente, publica un mensaje de "extinguido".
+	//
+	// Parámetros:
+	//   req: Un puntero a un objeto *pb.DroneEmergencyRequest que contiene
+	//        los detalles de la emergencia (ID del dron, nombre de la emergencia) necesarios para las actualizaciones.
+	//   tDesplazamiento: La duración total simulada que el dron tarda en desplazarse a la emergencia.
+	//   tApagado: La duración total simulada que el dron tarda en apagar la emergencia.
+	//
+	// Retorna:
+	//   Ninguno.
 	publishMessage := func(status string) {
 		updateMsg := map[string]string{
 			"status":         status,
@@ -151,6 +211,21 @@ func (s *server) publicarEstadoExtinguidoParaRegistro(req *pb.DroneEmergencyRequ
 }
 
 func (s *server) actualizarPosicionDron(droneID string, lat, lon float64) {
+	// actualizarPosicionDron actualiza la latitud, longitud y el estado de un dron en la base de datos MongoDB.
+	//
+	// Esta función toma el ID de un dron junto con sus nuevas coordenadas.
+	// Establece el estado del dron a "available" (disponible) y actualiza estas propiedades
+	// en la colección "drones" de la base de datos "emergencias". La operación de actualización
+	// incluye reintentos para manejar posibles fallos temporales de conexión a la base de datos.
+	// Registra el éxito o el fallo de la operación.
+	//
+	// Parámetros:
+	//   droneID: Una cadena que identifica el dron cuya posición y estado se van a actualizar.
+	//   lat: La nueva latitud del dron.
+	//   lon: La nueva longitud del dron.
+	//
+	// Retorna:
+	//   Ninguno.
 	coll := s.mongoClient.Database("emergencias").Collection("drones")
 
 	filter := bson.M{"id": droneID}

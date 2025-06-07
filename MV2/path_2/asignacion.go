@@ -41,6 +41,19 @@ type Drone struct {
 }
 
 func withRetry(action func() error, description string) error {
+	// withRetry ejecuta una función 'action' con reintentos en caso de fallo.
+	//
+	// Esta función intenta ejecutar la 'action' un número máximo de veces (definido por 'maxRetries').
+	// Si la 'action' retorna un error, espera un 'retryDelay' antes de reintentar.
+	// Muestra un mensaje de log en cada fallo y un mensaje final si todos los intentos fallan.
+	//
+	// Parámetros:
+	//   action: Una función sin parámetros que retorna un error. Esta es la operación que se intentará.
+	//   description: Una cadena que describe la acción que se está realizando, utilizada para los mensajes de log.
+	//
+	// Retorna:
+	//   error: nil si la 'action' se ejecuta exitosamente en cualquier intento,
+	//          o un error que describe el fallo definitivo si todos los reintentos fallan.
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = action()
@@ -56,6 +69,27 @@ func withRetry(action func() error, description string) error {
 }
 
 func (s *server) AssignDrone(ctx context.Context, req *pb.EmergencyRequest) (*emptypb.Empty, error) {
+	// AssignDrone es un método RPC que recibe una solicitud de emergencia,
+	// verifica si es una emergencia nueva o duplicada, y si es nueva, la procesa.
+	//
+	// El proceso incluye:
+	// 1. Bloquear para garantizar la exclusividad en el procesamiento de emergencias.
+	// 2. Comprobar en la base de datos si la emergencia ya existe para manejar la idempotencia.
+	// 3. Si es una nueva emergencia, la publica en el servicio de registro (RabbitMQ).
+	// 4. Busca el dron disponible más cercano y lo asigna a la emergencia.
+	// 5. Llama al servicio del dron para que atienda la emergencia.
+	// 6. Registra el resultado de la asignación y la misión del dron.
+	//
+	// Parámetros:
+	//   ctx: El contexto de la solicitud gRPC, que puede llevar información como cancelaciones o plazos.
+	//   req: Un puntero a un objeto *pb.EmergencyRequest que contiene los detalles de la emergencia
+	//        (nombre, latitud, longitud, magnitud).
+	//
+	// Retorna:
+	//   *emptypb.Empty: Un mensaje vacío que indica que la operación fue procesada (exitosamente o con un error manejado).
+	//   error: nil si la operación se completó sin errores fatales, o un error si ocurre un problema
+	//          crítico como un fallo de base de datos no relacionado con la ausencia de documentos,
+	//          o si no se puede asignar un dron.
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -99,6 +133,19 @@ func (s *server) AssignDrone(ctx context.Context, req *pb.EmergencyRequest) (*em
 }
 
 func (s *server) publishEmergencyToRegistry(doc bson.M) {
+	// publishEmergencyToRegistry serializa una emergencia en formato JSON y la publica
+	// en una cola de RabbitMQ para que sea procesada por el servicio de registro.
+	//
+	// La función primero convierte el documento BSON de la emergencia a JSON.
+	// Luego, intenta publicar este mensaje JSON en la cola "registro_queue" de RabbitMQ.
+	// La operación de publicación incluye reintentos para manejar fallos temporales.
+	// Imprime mensajes de log indicando el éxito o el fallo de la publicación.
+	//
+	// Parámetros:
+	//   doc: Un documento BSON (bson.M) que representa la emergencia a publicar.
+	//
+	// Retorna:
+	//   Ninguno.
 	body, err := json.Marshal(doc)
 	if err != nil {
 		log.Printf("❌ Error serializando emergencia para RabbitMQ: %v", err)
@@ -120,6 +167,24 @@ func (s *server) publishEmergencyToRegistry(doc bson.M) {
 }
 
 func (s *server) findNearestDrone(emLat, emLon float64) (*Drone, error) {
+	// findNearestDrone busca el dron más cercano disponible a una ubicación de emergencia
+	// y lo marca como "assigned" (asignado) en la base de datos.
+	//
+	// La función consulta la colección "drones" en MongoDB para encontrar todos los drones con estado "available".
+	// Luego, calcula la distancia euclidiana de cada dron a las coordenadas de la emergencia
+	// y selecciona el dron más cercano. Finalmente, actualiza el estado de este dron a "assigned"
+	// en la base de datos. Toda la operación de búsqueda y actualización se realiza con reintentos
+	// utilizando la función `withRetry`.
+	//
+	// Parámetros:
+	//   emLat: La latitud de la emergencia.
+	//   emLon: La longitud de la emergencia.
+	//
+	// Retorna:
+	//   *Drone: Un puntero a la estructura Drone del dron más cercano y asignado,
+	//           o nil si no se encuentra un dron disponible o si ocurre un error.
+	//   error: nil si la operación es exitosa, o un error si falla la conexión a la base de datos,
+	//          no hay drones disponibles, o si la actualización del estado del dron falla.
 	collection := s.mongoClient.Database("emergencias").Collection("drones")
 	var drones []Drone
 	var nearest *Drone
@@ -168,6 +233,20 @@ func (s *server) findNearestDrone(emLat, emLon float64) (*Drone, error) {
 }
 
 func llamarADron(emergency *pb.EmergencyRequest, droneID string) error {
+	// llamarADron intenta contactar a un servicio de drones para atender una emergencia específica.
+	//
+	// Esta función primero intenta establecer una conexión gRPC con el servicio de drones,
+	// reintentando la conexión en caso de fallo. Una vez conectado, construye una solicitud
+	// de emergencia para el dron especificado y llama al método RPC 'AtenderEmergencia'
+	// del servicio de drones, también con reintentos.
+	//
+	// Parámetros:
+	//   emergency: Un puntero a un objeto *pb.EmergencyRequest que contiene los detalles de la emergencia.
+	//   droneID: Una cadena que identifica al dron específico al que se le asignará la emergencia.
+	//
+	// Retorna:
+	//   error: nil si la conexión y la llamada RPC son exitosas, o un error si alguna de las
+	//          operaciones (conexión o llamada RPC) falla definitivamente después de los reintentos.
 	var conn *grpc.ClientConn
 	var err error
 

@@ -13,7 +13,20 @@ RABBITMQ_HOST = 'localhost'
 QUEUE_NAME = 'registro_queue' 
 
 def connect_to_mongodb():
-    """Intenta conectar a MongoDB con reintentos."""
+    """
+    Intenta establecer una conexión con una base de datos MongoDB, aplicando una lógica de reintentos.
+
+    La función intentará conectar a MongoDB un número predefinido de veces (MAX_RETRIES),
+    esperando un tiempo (RETRY_DELAY) entre cada intento si la conexión falla.
+    Utiliza un comando 'ping' para verificar que la conexión es realmente funcional.
+
+    Parámetros:
+        Ninguno (utiliza las constantes globales MONGO_URI, MAX_RETRIES, RETRY_DELAY).
+
+    Retorna:
+        pymongo.MongoClient: Un objeto de cliente MongoDB si la conexión es exitosa.
+        None: Si todos los intentos de conexión fallan.
+    """
     for i in range(MAX_RETRIES):
         try:
             client = pymongo.MongoClient(MONGO_URI)
@@ -27,7 +40,19 @@ def connect_to_mongodb():
     return None
 
 def connect_to_rabbitmq():
-    """Intenta conectar a RabbitMQ con reintentos."""
+     """
+    Intenta establecer una conexión con RabbitMQ, aplicando una lógica de reintentos.
+
+    La función intentará conectar a RabbitMQ un número predefinido de veces (MAX_RETRIES),
+    esperando un tiempo (RETRY_DELAY) entre cada intento si la conexión falla.
+
+    Parámetros:
+        Ninguno (utiliza las constantes globales RABBITMQ_HOST, MAX_RETRIES, RETRY_DELAY).
+
+    Retorna:
+        pika.BlockingConnection: Un objeto de conexión a RabbitMQ si la conexión es exitosa.
+        None: Si todos los intentos de conexión fallan.
+    """
     for i in range(MAX_RETRIES):
         try:
             connection = pika.BlockingConnection(pika.ConnectionParameters(RABBITMQ_HOST))

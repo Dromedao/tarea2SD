@@ -75,6 +75,28 @@ func main() {
 }
 
 func listenForUpdates(conn *grpc.ClientConn, done chan<- bool, announced map[string]bool) {
+	// listenForUpdates establece un stream gRPC con el servicio de monitoreo
+	// para recibir actualizaciones sobre el estado de las emergencias y drones.
+	//
+	// La función intenta abrir el stream hasta 20 veces, esperando 5 segundos entre cada intento.
+	// Si no logra abrir el stream después de los intentos, cierra el canal 'done'
+	// e imprime un mensaje de error, indicando que no se recibirán más actualizaciones.
+	//
+	// Una vez que el stream se establece, la función entra en un bucle infinito para recibir actualizaciones.
+	// Cada actualización es un mensaje JSON que se deserializa a una estructura StatusUpdate.
+	// Dependiendo del estado de la emergencia, se imprimen mensajes en la consola.
+	// Si una emergencia es "extinguida", envía una señal a través del canal 'done'.
+	//
+	// Parámetros:
+	//   conn: Una conexión gRPC establecida con el servidor de monitoreo.
+	//   done: Un canal de solo escritura (chan<- bool) utilizado para enviar una señal
+	//         cuando una emergencia ha sido extinguida o si el stream falla definitivamente.
+	//   announced: Un mapa (map[string]bool) para llevar un registro de las emergencias
+	//              que ya han sido anunciadas para evitar duplicados.
+	//
+	// Retorna:
+	//   Ninguno (la función se ejecuta en un bucle infinito hasta que el stream se desconecta
+	//   o falla, momento en el que retorna o cierra el canal 'done').
 	monitoringClient := pb.NewMonitoringServiceClient(conn)
 
 	var stream pb.MonitoringService_StreamUpdatesClient
@@ -125,6 +147,16 @@ func listenForUpdates(conn *grpc.ClientConn, done chan<- bool, announced map[str
 }
 
 func readEmergenciesFromFile() []Emergency {
+	// readEmergenciesFromFile lee un archivo JSON de emergencias y lo deserializa en una slice de Emergency.
+	//
+	// Esta función intenta abrir el archivo especificado como el primer argumento de línea de comandos.
+	// Si no se proporciona ningún argumento, por defecto usa "emergencias.json".
+	// Lee todo el contenido del archivo y lo parsea como un JSON.
+	//
+	// Retorna:
+	//   []Emergency: Una slice de estructuras Emergency que contiene los datos leídos del archivo.
+	//
+	// En caso de que ocurra un error al abrir el archivo, la función termina la ejecución del programa con un mensaje fatal.
 	args := os.Args
 	if len(args) < 2 {
 		args = append(args, "emergencias.json")
@@ -141,6 +173,17 @@ func readEmergenciesFromFile() []Emergency {
 }
 
 func mustConnect(serviceName, addr string) *grpc.ClientConn {
+	// mustConnect intenta establecer una conexión gRPC con un servicio dado.
+	// Reintentará la conexión hasta 20 veces con un intervalo de 10 segundos entre cada intento.
+	//
+	// Parámetros:
+	//   serviceName: Una cadena que representa el nombre del servicio al que se intenta conectar (usado para mensajes de error).
+	//   addr: La dirección del servidor gRPC al que conectar (ej. "localhost:50051").
+	//
+	// Retorna:
+	//   *grpc.ClientConn: Un objeto de conexión gRPC si la conexión es exitosa.
+	//
+	// Si todos los intentos fallan, la función termina la ejecución del programa con un mensaje de error fatal.
 	var conn *grpc.ClientConn
 	var err error
 	for i := 0; i < 20; i++ {
