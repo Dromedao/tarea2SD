@@ -8,6 +8,8 @@ A lo largo del README se habla de maquina virtual 1,2 y 3. Por cada maquina se e
 - MV2: IP 10.10.28.15
 - MV3: IP 10.10.28.16
 
+Cabe destacar que en el paso 5 de intrucciones de despliegue y ejecución, están los comandos para ejecutar el proyecto.
+
 ## Aclaración importante
 Si bien logramos realizar la mayor parte de la configuración, como el cambio de ip a las de cada maquina, creación de usuario para que rabbitMQ permita conexiónes externas, configuracion de mongo para conexiones externas, entre otras, tuvimos un problema con la maquina virtual 2 lo cual no nos permitió probar el código ya que no tenemos acceso a dicha maquina.
 
@@ -111,18 +113,18 @@ go run path_2/asignacion.go
 - En MV2 (Terminal 3), inicie el Servicio de Registro:
 
 ```Bash
-python3 registro.py
+python3 path_3/registro.py
 ```
 
 - En MV1 (Terminal 4), inicie el Servicio de Monitoreo:
 
 ```Bash
-go run monitoreo.go
+go run path_4/monitoreo.go
 ```
 - En MV3 (Terminal 5), inicie el Servicio de Drones:
 
 ```Bash
-go run drones.go
+go run path_5/drones.go
 ```
 
 ## Consideraciones Especiales
